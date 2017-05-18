@@ -14,15 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import webapp2
-import os
-import jinja2
+import webapp2, jinja2, os, re
+from google.appengine.ext import db
+from models import Post, User, Comment
+import hashutils
 
 template_dir = (os.path.dirname(__file__), 'templates')
 jinja_env = jinja2.Environment(loader = jinja2.FileSystemLoader(template_dir),
         autoescape = True)
 
 class Handler(webapp2.RequestHandler):
+    """Helper class with all the useful methods that my request handlers will need"""
+
     def write(self, *a, **kw):
         self.response.out.write(*a, **kw)
 
@@ -33,9 +36,43 @@ class Handler(webapp2.RequestHandler):
     def render(self, template, **kw):
         self.write(self.render_str(template, **kw))
 
+    def login_user(self, user):
+        """Login a user"""
+        user_id = user.key().id()
+        self.set_secure_cookie('user_id', str(user_id))
+
+    def logout_user(self):
+        """Logout A user"""
+        self.set_secure_cookie('user_id', '')
+
+    def read_secure_cookie(self, name):
+        cookie_val = self.request.cookies.get(name)
+        if cookie_val:
+            return hashutils.check_secure_val(cookie_val)
+
+    def set_secure_cookie(self, name, val):
+        cookie_val = hashutils.make_secure_val(val)
+        self.response.headers.add_header('Set-Cookie', '%s=%s; Path=/' % (name, cookie_val))
+
+    def initialize(self, *a, **kw):
+        """
+        Filter to restrict acces to certain pages when not logged in. if the request path is
+        in the global auth_paths list, then the user must be signed in to access the path/resource.
+        """
+        webapp2.RequestHandler.initialize(self, *a, **kw)
+        uid = self.read_secure_cookie('user_id')
+        self.user = uid and User.get_by_id(int(uid))
+
+        if not self.user and self.request.path in auth_paths:
+            self.redirect('/')
+
+"""
+Handlers for all the pages
+"""
+
 class MainHandler(Handler):
     def get(self):
-        self.redirect('/blog')
+        self.redirect('/home')
 
 class FrontpageHandler(Handler):
     def get(self):
@@ -43,6 +80,11 @@ class FrontpageHandler(Handler):
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler),
-    ('/blog', FrontpageHandler),
+    ('/home', FrontpageHandler),
 ], debug=True)
 
+""" List of paths that user must be logged in to access"""
+auth_paths = [
+        '/login',
+        '/newpost'
+]
