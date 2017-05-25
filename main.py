@@ -67,7 +67,7 @@ class Handler(webapp2.RequestHandler):
             self.redirect('/')
 
 """
-Handlers for all the pages
+Handlers for the front page, and "/" that redirects to "/home"
 """
 
 class MainHandler(Handler):
@@ -77,6 +77,39 @@ class MainHandler(Handler):
 class FrontpageHandler(Handler):
     def get(self):
         self.render('frontpage.html')
+
+"""
+Handler for making a new post, get method displays the form, and post method checks if the post is valid.
+if the post is valid, the method creates a new Post object and stores it in the database. Redirects to /{Category_name}/{post_id}
+"""
+class NewPostHandler(Handler):
+    def get(self, title = "", body = "", category = "", error = "")
+        self.render('newpost.html', title=title, body=body, category=category, error=error)
+
+    def post(self):
+        title         = self.request.get("title")
+        body          = self.request.get("body")
+        category      = self.request.get("category")
+
+    if title and body:
+        post = Post(
+                title  = title,
+                body   = body,
+                author = self.user)
+        category = Category(
+                category_name = category,
+                post = post)
+        post.put()
+        category.put()
+
+        PostId = post.key().id()
+
+
+        self.redirect("/{}/{}".format(category, PostId))
+
+    else:
+        error = "You forgot a title, body, or a category bozo."
+        self.render(title, body, category, error)
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler),
